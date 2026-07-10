@@ -28,8 +28,11 @@ Sending a file:
 $ nymx -a alice file
 ```
 
-If you like NymX consider a small donation    
-in crypto currencies or buy me a coffee.  
+There are two helper utilities for NymX available. ['sam'](https://github.com/Ch1ffr3punk/sam) to split    
+large files and ['get'](https://github.com/Ch1ffr3punk/get) if you run NymX on a VPS, to fetch your files.   
+
+If you are a privacy enthusiast and use NymX on a regular basis  
+consider a small donation in crypto currencies or buy me a coffee.    
 ```
 BTC: bc1qm0e7r94ht60tu7zuewf0ftl3td0xc700rvcagn
 Nym: n1f0r6zzu5hgh4rprk2v2gqcyr0f5fr84zv69d3x          
