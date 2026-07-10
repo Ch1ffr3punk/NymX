@@ -1,0 +1,16 @@
+--- FILE HASHES (RIPEMD-160) ---
+Cargo.toml: 9b4fc4435c8605f6bff67a9007db0f01276f643a
+LICENSE: 304c26c26e8af4d60f1e0818baa73f8ac9b511fd
+README.md: f717677ed6590eba658bb654ad5c30e4573808f8
+nymx.json: 3eebd3ef70579baff903aea700ab6145457a5e23
+src\alias.rs: ccfc6cca8cd419911d59a2bd2c4d6d5401fd54a1
+src\main.rs: 5b6a9f6af768104f27ca0886482cf9d972d2a609
+src\network.rs: bb26c22e9e4f67bad7c26015907532929cb1078c
+src\protocol.rs: b84841d0c0075a020700bd0ef66cf2aca01066e2
+src\receive.rs: 658919dd8d33b4c38382fec88e9a72fc20a6f7f7
+src\send.rs: 891c838f4990ae4b413a63964bbe88ad34b80b7e
+src\utils.rs: 732da3d71c0cc0d2ca201aa0c22f596f88ec1af7
+whitelist.json: c44a9445ecabbac7b11615b02fca251cb9e3002d
+
+--- ROOT HASH (RIPEMD-160) ---
+bdb183b3caf1b19405fc0adffc555b2b48b90e84

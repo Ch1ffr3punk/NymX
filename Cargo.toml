@@ -1,0 +1,23 @@
+[package]
+name = "nymx"
+version = "0.1.1"
+edition = "2021"
+authors = ["Ch1ffr3punk"]
+description = "A data exchange tool for the Nym Mixnet"
+license = "Apache 2.0"
+
+[dependencies]
+nym-sdk = "1.21.2"
+tokio = { version = "1", features = ["full"] }
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
+ctrlc = { version = "3", features = ["termination"] }
+ripemd = "0.1"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true
