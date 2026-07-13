@@ -1,6 +1,6 @@
 [package]
-name = "nymx"
-version = "0.1.1"
+name = "NymX"
+version = "0.1.2"
 edition = "2021"
 authors = ["Ch1ffr3punk"]
 description = "A data exchange tool for the Nym Mixnet"
@@ -15,6 +15,9 @@ serde_json = "1"
 anyhow = "1"
 ctrlc = { version = "3", features = ["termination"] }
 ripemd = "0.1"
+ssh2 = "0.9"
+rpassword = "7"
+indicatif = "0.17"
 
 [profile.release]
 opt-level = 3

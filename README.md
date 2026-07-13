@@ -10,6 +10,7 @@ Arguments:
 Options:
   -t, --receiver <RECEIVER_ADDR>
   -r, --receive
+  -g, --get-files                   Download files from ~/received/ on remote server via SSH
   -o, --out <OUTPUT_DIR>            [default: ./received]
   -c, --chunk-size <CHUNK_SIZE_KB>  [default: 64]
   -R, --rate <CHUNKS_PER_SECOND>    [default: 1]
@@ -17,7 +18,7 @@ Options:
   -w, --whitelist <WHITELIST>
   -q, --quota <QUOTA_MIB>
   -h, --help                        Print help
-  -V, --version                     Print Version
+  -V, --version                     Print version
 
 Receiving files:
 
@@ -28,8 +29,7 @@ Sending a file:
 $ nymx -a alice file
 ```
 
-There are two helper utilities for NymX available. ['sam'](https://github.com/Ch1ffr3punk/sam) to split    
-large files and ['get'](https://github.com/Ch1ffr3punk/get) if you run NymX on a VPS, to fetch your files.   
+There is a helper Utility called ['sam'](https://github.com/Ch1ffr3punk/sam) available to split large files.  
 
 If you are a privacy enthusiast and use NymX on a regular basis  
 consider a small donation in crypto currencies or buy me a coffee.    
