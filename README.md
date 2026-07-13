@@ -29,7 +29,7 @@ Sending a file:
 $ nymx -a alice file
 ```
 
-There is a helper Utility called ['sam'](https://github.com/Ch1ffr3punk/sam) available to split large files.  
+There is a helper utility called ['sam'](https://github.com/Ch1ffr3punk/sam) available to split large files.  
 
 If you are a privacy enthusiast and use NymX on a regular basis  
 consider a small donation in crypto currencies or buy me a coffee.    
