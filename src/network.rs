@@ -10,10 +10,12 @@ pub struct NymNode {
 
 impl NymNode {
     pub async fn connect() -> Result<Self> {
-        eprintln!("Initializing NymX...");
-        eprintln!("Loading or generating keys...");
+        let base_dir = crate::config::find_config_file()
+            .and_then(|p| p.parent().map(|d| d.to_path_buf()))
+            .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
 
-        let config_dir = PathBuf::from("nymx");
+        let config_dir = base_dir.join("nymx-nym");
+
         if !config_dir.exists() {
             fs::create_dir_all(&config_dir).context("Failed to create storage directory")?;
         }
@@ -60,7 +62,6 @@ impl NymNode {
     }
 
     pub async fn disconnect(self) {
-        eprintln!("Disconnecting from Nym Mixnet...");
         self.client.disconnect().await;
     }
 }

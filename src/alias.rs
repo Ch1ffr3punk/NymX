@@ -2,8 +2,7 @@ use anyhow::{Context, Result};
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs;
-
-pub const ALIASES_FILE: &str = "nymx.json";
+use crate::config::find_config_file; 
 
 #[derive(Deserialize)]
 pub struct AliasesFile {
@@ -11,11 +10,11 @@ pub struct AliasesFile {
 }
 
 pub fn resolve_alias(alias: &str) -> Result<String> {
-    let content = fs::read_to_string(ALIASES_FILE).with_context(|| {
-        format!(
-            "Aliases file '{}' not found. Create it with:\n{{\n  \"aliases\": {{\n    \"alice\": \"AliceNymAddressHere\",\n    \"bob\": \"BobNymAddressHere\"\n  }}\n}}",
-            ALIASES_FILE
-        )
+    let config_path = find_config_file()
+        .context("Aliases file 'nymx.json' not found in standard locations.")?;
+
+    let content = fs::read_to_string(&config_path).with_context(|| {
+        format!("Failed to read aliases file at {:?}", config_path)
     })?;
 
     let aliases: AliasesFile =
@@ -25,5 +24,5 @@ pub fn resolve_alias(alias: &str) -> Result<String> {
         .aliases
         .get(alias)
         .cloned()
-        .with_context(|| format!("Alias '{}' not found in {}", alias, ALIASES_FILE))
+        .with_context(|| format!("Alias '{}' not found in {:?}", alias, config_path))
 }

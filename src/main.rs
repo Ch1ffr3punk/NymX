@@ -65,7 +65,11 @@ async fn main() -> Result<()> {
         return Ok(());
     }
 
-    let config = load_config();
+    let config = if !cli.receive_mode {
+        load_config()
+    } else {
+        config::NymxConfig::default()
+    };
 
     if !cli.receive_mode {
         if cli.chunk_size_kb < 1 {
@@ -79,9 +83,6 @@ async fn main() -> Result<()> {
         }
         if cli.quota_mib.is_some() {
             eprintln!("[Warning] -q/--quota is only effective in receive mode (-r)");
-        }
-        if cli.whitelist.is_some() {
-            eprintln!("[Warning] -w/--whitelist is only effective in receive mode (-r)");
         }
     } else {
         if let Some(q) = cli.quota_mib {

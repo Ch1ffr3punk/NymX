@@ -1,13 +1,13 @@
 --- FILE HASHES (RIPEMD-160) ---
-Cargo.toml: fa48ef199aa15cce7ffa24b5c0da7600635a6cd6
+Cargo.toml: 8975eb19db2d1e067e5fec86ebd07ca169abcc8d
 LICENSE: 304c26c26e8af4d60f1e0818baa73f8ac9b511fd
 README.md: 59e2debdf902ab1234d8f2f6c4cba6f0cf5c0099
 nymx.json: a4f7bb2ae85a42169eec900daca9e4b54a1bc0ae
-src\alias.rs: ccfc6cca8cd419911d59a2bd2c4d6d5401fd54a1
+src\alias.rs: 68d69de070747d428d4946f2cf541305429aa647
 src\config.rs: 276150096be6b72c355f5272b52425022f5ebfe5
 src\get.rs: 4c3f156c937fc51fcae60e23166a3a4791e3a49a
-src\main.rs: 088b2cb99f4498b5b996cd725783fafdfda7ca5a
-src\network.rs: bb26c22e9e4f67bad7c26015907532929cb1078c
+src\main.rs: e97609a3f92412aed0d71d643e8686c53e37e2d4
+src\network.rs: 5bde469d6b59f3431b220d362214435a68b70ad9
 src\protocol.rs: b84841d0c0075a020700bd0ef66cf2aca01066e2
 src\receive.rs: 658919dd8d33b4c38382fec88e9a72fc20a6f7f7
 src\send.rs: 891c838f4990ae4b413a63964bbe88ad34b80b7e
@@ -16,4 +16,4 @@ src\utils.rs: 732da3d71c0cc0d2ca201aa0c22f596f88ec1af7
 whitelist.json: c44a9445ecabbac7b11615b02fca251cb9e3002d
 
 --- ROOT HASH (RIPEMD-160) ---
-4eacd9d4fea1213d53cd3b96dfad0ca5b4a7f8a8
+293c3c917bbd1948be71c04d25fa4ebc98da54f2
