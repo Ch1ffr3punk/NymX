@@ -1,0 +1,38 @@
+$ nano /etc/systemd/system/nymx.service
+
+Content of nymx.service:
+
+----- cut here -----
+[Unit]
+Description=nymx
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/home/nymx/nymx -r
+WorkingDirectory=/home/nymx
+Environment="HOME=/home/nymx"
+Restart=always
+RestartSec=5
+User=nymx
+Group=nymx
+
+[Install]
+WantedBy=multi-user.target
+----- cut here -----
+
+Activate nymx and start:
+
+# Reload service
+systemctl daemon-reload
+
+# Enable service (autostart on boot)
+systemctl enable nymx
+
+# Start service
+systemctl start nymx
+
+# Check status
+systemctl status nymx
+
+

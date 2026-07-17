@@ -1,0 +1,13 @@
+{
+  "aliases": {
+    "alice": "AliceNymAddress",
+    "bob": "BobNymAddress",
+    "carol": "CarolNymAddress"
+  },
+  "ssh": {
+    "host": "abcdef1234567890.onion",
+    "port": 22,
+    "username": "Ch1ffr3punk",
+    "socks5_proxy": "127.0.0.1:9050",
+  }
+}
