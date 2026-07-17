@@ -35,14 +35,6 @@ Example nymx.json (for -s and -g):
 
 Note: The receiver (-r) does NOT need nymx.json. Use -p to specify the save path.
 Note: For --part mode, ensure sam's ripemd-160.txt exists in the current directory.
-
-Receiving files:
-
-$ nymx -r
-
-Sending a file:
-
-$ nymx -a alice file
 ```
 
 There is a helper utility called ['sam'](https://github.com/Ch1ffr3punk/sam) available to split large files.  

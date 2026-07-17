@@ -1,7 +1,7 @@
 --- FILE HASHES (RIPEMD-160) ---
 Cargo.toml: 2e25bb4c154e1cc6dac122fe184621c052e0b867
 LICENSE: 304c26c26e8af4d60f1e0818baa73f8ac9b511fd
-README.md: b6bfbd9ad6fd04b3e4a7f6ca7a884d713e32f842
+README.md: eac64009e122eb8f5178137c9cf089e602412c38
 nymx.json: 60c9e839253f50f12ea28aaf68fb0a3be23fae1f
 src\config.rs: befaba14d4eac354e092cb266609148d88c90d7f
 src\get.rs: 09b1bc1bbb04237bc2c4ccc7169ec164126ac29a
@@ -13,4 +13,4 @@ systemd-nymx.txt: 3dd7d32dddda65de50cfa1435cdb1a122d9c541b
 yubisigner-signing-certificate-eIDAS-certified.pdf.ots: e3befa1e006bc3d2afcc143b10900c0ac0138db3
 
 --- ROOT HASH (RIPEMD-160) ---
-24fd33eb26436642cf013c07d3f7b37c6c04e6f9
+d55e76c1fd5f22cbf4d531301f28f2ece76c0f94
