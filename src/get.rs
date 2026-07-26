@@ -1,5 +1,6 @@
 use crate::config::Config;
 use crate::ssh::connect_ssh;
+use filetime::{set_file_times, FileTime};
 use indicatif::{ProgressBar, ProgressStyle};
 use ssh2::Session;
 use std::collections::HashSet;
@@ -59,10 +60,9 @@ pub async fn run_get_mode() -> Result<(), Box<dyn std::error::Error>> {
 
     let in_use_files = get_in_use_files(&session, &remote_dir).await?;
     let files = list_remote_files(&session, &remote_dir).await?;
-
     spinner.finish_with_message("Ready");
-    println!("Found {} files", files.len());
 
+    println!("Found {} files", files.len());
     if files.is_empty() {
         println!("No files to download");
         return Ok(());
@@ -95,7 +95,6 @@ pub async fn run_get_mode() -> Result<(), Box<dyn std::error::Error>> {
         match download_file(&session, &remote_dir, &local_dir, filename).await {
             Ok(_) => {
                 downloaded += 1;
-                
                 let remote_file = format!("{}/{}", remote_dir, filename);
                 match delete_file_remote(&session, &remote_file).await {
                     Ok(_) => deleted += 1,
@@ -110,13 +109,11 @@ pub async fn run_get_mode() -> Result<(), Box<dyn std::error::Error>> {
                 eprintln!("\nFailed to download {}: {}", filename, e);
             }
         }
-
         overall_pb.inc(1);
         sleep(Duration::from_millis(50)).await;
     }
 
     overall_pb.finish_with_message("Done");
-
     println!("\nSummary:");
     println!("  Downloaded: {}", downloaded);
     println!("  Deleted: {}", deleted);
@@ -195,7 +192,7 @@ async fn download_file(
     let remote_full = format!("{}/{}", remote_path, filename);
     let local_path = local_dir.join(filename);
     let file_size = get_file_size_remote(session, &remote_full).await?;
-
+    
     let pb = ProgressBar::new(file_size);
     pb.set_style(
         ProgressStyle::with_template(
@@ -207,24 +204,30 @@ async fn download_file(
     pb.set_message(format!("Downloading {}", filename));
 
     let (mut channel, _) = session.scp_recv(Path::new(&remote_full))?;
-    let mut local_file = std::fs::File::create(&local_path)?;
-    let mut buffer = vec![0u8; 32768];
-    let mut downloaded = 0u64;
 
-    loop {
-        let n = channel.read(&mut buffer)?;
-        if n == 0 {
-            break;
+    {
+        let mut local_file = std::fs::File::create(&local_path)?;
+        let mut buffer = vec![0u8; 32768];
+        let mut downloaded = 0u64;
+        loop {
+            let n = channel.read(&mut buffer)?;
+            if n == 0 {
+                break;
+            }
+            local_file.write_all(&buffer[..n])?;
+            downloaded += n as u64;
+            pb.set_position(downloaded);
         }
-        local_file.write_all(&buffer[..n])?;
-        downloaded += n as u64;
-        pb.set_position(downloaded);
+        local_file.sync_all()?;
     }
 
     channel.send_eof()?;
     channel.wait_eof()?;
     channel.close()?;
     channel.wait_close()?;
+
+    let epoch = FileTime::from_unix_time(0, 0);
+    set_file_times(&local_path, epoch, epoch)?;
 
     pb.finish_with_message(format!("Downloaded {}", filename));
     Ok(())

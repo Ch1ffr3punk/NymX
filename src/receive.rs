@@ -7,6 +7,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 use tokio::signal;
+use filetime::{set_file_times, FileTime};
 
 const APP_TAG_LEN: usize = 22;
 const TRANSFER_TIMEOUT_SECS: u64 = 600;
@@ -97,9 +98,11 @@ pub async fn receive_mode(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let receive_path = custom_path.unwrap_or_else(|| PathBuf::from("./received"));
     fs::create_dir_all(&receive_path)?;
+
     let base_dir = crate::config::get_base_dir();
     let config_dir = base_dir.join("nymx-config");
     let paths = StoragePaths::new_from_dir(config_dir.to_str().unwrap()).unwrap();
+
     let mut client = mixnet::MixnetClientBuilder::new_with_default_storage(paths)
         .await
         .unwrap()
@@ -171,11 +174,13 @@ pub async fn receive_mode(
                     let sender_tag = message.sender_tag.clone();
                     let mut transfers_lock = transfers.lock().unwrap();
                     let now = Instant::now();
+
                     let timed_out: Vec<String> = transfers_lock
                         .iter()
                         .filter(|(_, transfer)| now.duration_since(transfer.last_activity).as_secs() > TRANSFER_TIMEOUT_SECS)
                         .map(|(app_tag, _)| app_tag.clone())
                         .collect();
+
                     for app_tag in timed_out {
                         if let Some(transfer) = transfers_lock.remove(&app_tag) {
                             println!("\nTransfer timed out for '{}'", transfer.filename);
@@ -231,7 +236,12 @@ pub async fn receive_mode(
                         
                         let completed_transfer = transfers_lock.remove(&app_tag).unwrap();
                         drop(completed_transfer);
-                        
+
+                        let epoch = FileTime::from_unix_time(0, 0);
+                        if let Err(e) = set_file_times(&final_path, epoch, epoch) {
+                            eprintln!("[ERROR] Failed to set file times: {}", e);
+                        }
+
                         let mut completed_lock = completed_transfers.lock().unwrap();
                         completed_lock.insert(app_tag.clone());
                         drop(completed_lock);
@@ -297,7 +307,7 @@ fn parse_chunk_payload(payload: &[u8]) -> Result<(usize, usize, u64, String, Str
     let chunk_idx = u32::from_be_bytes([payload[0], payload[1], payload[2], payload[3]]) as usize;
     let total_chunks = u32::from_be_bytes([payload[4], payload[5], payload[6], payload[7]]) as usize;
     let file_size = u64::from_be_bytes([
-        payload[8], payload[9], payload[10], payload[11], 
+        payload[8], payload[9], payload[10], payload[11],
         payload[12], payload[13], payload[14], payload[15]
     ]);
     let filename_len = u16::from_be_bytes([payload[16], payload[17]]) as usize;
