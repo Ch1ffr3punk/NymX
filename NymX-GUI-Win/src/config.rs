@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::env;
+use std::fs;
 use std::path::PathBuf;
 
 #[derive(Serialize, Deserialize, Default)]
@@ -44,11 +45,19 @@ impl Config {
         let base_dir = get_base_dir();
         let config_path = base_dir.join("nymx.json");
         if config_path.exists() {
-            let content = std::fs::read_to_string(config_path).unwrap_or_default();
+            let content = fs::read_to_string(config_path).unwrap_or_default();
             serde_json::from_str(&content).unwrap_or_default()
         } else {
             Config::default()
         }
+    }
+
+    pub fn save(&self) -> Result<(), Box<dyn std::error::Error>> {
+        let base_dir = get_base_dir();
+        let config_path = base_dir.join("nymx.json");
+        let content = serde_json::to_string_pretty(self)?;
+        fs::write(config_path, content)?;
+        Ok(())
     }
 
     pub fn resolve(&self, input: &str) -> Option<String> {

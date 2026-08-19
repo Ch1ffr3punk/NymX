@@ -8,7 +8,6 @@ Usage:
                                       -p: Path to save files (default: ./received)
   nymx -s <target> <file>           - Send mode: Send a file anonymously
   nymx -s --part <target> <prefix>  - Send parts mode: Send multiple parts sequentially
-  nymx -g                           - Get mode: Download files from SSH server via Tor
 
 Examples:
   nymx -r
@@ -16,20 +15,13 @@ Examples:
   nymx -s AliceNymAddress document.pdf
   nymx -s alice document.pdf (using alias from nymx.json)
   nymx -s --part alice movie.mp4.part
-  nymx -g
 
-Example nymx.json (for -s and -g):
+Example nymx.json (for -s):
   {
     "aliases": {
       "alice": "AliceNymAddress",
       "bob": "BobNymAddress",
       "carol": "CarolNymAddress"
-    },
-    "ssh": {
-      "host": "abcdef1234567890.onion",
-      "port": 22,
-      "username": "Ch1ffr3punk",
-      "socks5_proxy": "127.0.0.1:9050"
     }
   }
 

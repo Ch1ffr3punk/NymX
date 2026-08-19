@@ -1,8 +1,6 @@
 mod config;
-mod get;
 mod receive;
 mod send;
-mod ssh;
 
 use clap::Parser;
 use std::path::PathBuf;
@@ -14,8 +12,6 @@ struct Cli {
     receive: bool,
     #[arg(short = 's')]
     send: bool,
-    #[arg(short = 'g')]
-    get: bool,
     #[arg(short = 'p', long = "path")]
     path: Option<PathBuf>,
     #[arg(long = "part")]
@@ -43,8 +39,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 send::send_mode(address, file_path).await?;
             }
         }
-    } else if cli.get {
-        get::run_get_mode().await?;
     } else {
         print_help();
     }
@@ -61,7 +55,6 @@ fn print_help() {
     println!("                                      -p: Path to save files (default: ./received)");
     println!("  nymx -s <target> <file>           - Send mode: Send a file anonymously");
     println!("  nymx -s --part <target> <prefix>  - Send parts mode: Send multiple parts sequentially");
-    println!("  nymx -g                           - Get mode: Download files from SSH server via Tor");
     println!();
     println!("Examples:");
     println!("  nymx -r");
@@ -69,20 +62,13 @@ fn print_help() {
     println!("  nymx -s AliceNymAddress document.pdf");
     println!("  nymx -s alice document.pdf (using alias from nymx.json)");
     println!("  nymx -s --part alice movie.mp4.part");
-    println!("  nymx -g");
     println!();
-    println!("Example nymx.json (for -s and -g):");
+    println!("Example nymx.json (for -s):");
     println!("  {{");
     println!("    \"aliases\": {{");
     println!("      \"alice\": \"AliceNymAddress\",");
     println!("      \"bob\": \"BobNymAddress\",");
     println!("      \"carol\": \"CarolNymAddress\"");
-    println!("    }},");
-    println!("    \"ssh\": {{");
-    println!("      \"host\": \"abcdef1234567890.onion\",");
-    println!("      \"port\": 22,");
-    println!("      \"username\": \"Ch1ffr3punk\",");
-    println!("      \"socks5_proxy\": \"127.0.0.1:9050\"");
     println!("    }}");
     println!("  }}");
     println!();

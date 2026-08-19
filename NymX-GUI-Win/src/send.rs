@@ -6,6 +6,8 @@ use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::{Read, Seek, SeekFrom};
 use std::path::PathBuf;
+use std::sync::OnceLock;
+use std::sync::mpsc;
 use std::time::{Duration, Instant};
 use tokio::time::{sleep, timeout};
 
@@ -18,9 +20,34 @@ const HANDSHAKE_CHUNK_IDX: u32 = 0xFFFFFFFF;
 const HANDSHAKE_TIMEOUT_SECS: u64 = 20;
 const RESEND_REQUEST_PREFIX: &str = "RESEND:";
 
+static LOG_SENDER: OnceLock<mpsc::Sender<String>> = OnceLock::new();
+
+pub fn set_log_sender(tx: mpsc::Sender<String>) {
+    let _ = LOG_SENDER.set(tx);
+}
+
+macro_rules! log {
+    ($($arg:tt)*) => {
+        if let Some(tx) = LOG_SENDER.get() {
+            let _ = tx.send(format!($($arg)*));
+        } else {
+            println!($($arg)*);
+        }
+    };
+}
+
+macro_rules! log_err {
+    ($($arg:tt)*) => {
+        if let Some(tx) = LOG_SENDER.get() {
+            let _ = tx.send(format!("ERROR: {}", format!($($arg)*)));
+        } else {
+            eprintln!($($arg)*);
+        }
+    };
+}
+
 pub async fn send_mode(address: String, file_path: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     let start_time = Instant::now();
-
     let mut client = mixnet::MixnetClientBuilder::new_ephemeral()
         .build()
         .unwrap()
@@ -29,8 +56,8 @@ pub async fn send_mode(address: String, file_path: PathBuf) -> Result<(), Box<dy
         .unwrap();
 
     let our_address = client.nym_address();
-    println!("Your Nym address: {}", our_address);
-    println!("Sending anonymously to: {}\n", address);
+    log!("Your ephemeral Nym address: {}", our_address);
+    log!("Sending anonymously to: {}\n", address);
 
     let file_metadata = std::fs::metadata(&file_path)?;
     let file_size_bytes = file_metadata.len();
@@ -42,40 +69,40 @@ pub async fn send_mode(address: String, file_path: PathBuf) -> Result<(), Box<dy
         .to_string_lossy()
         .to_string();
 
-    println!("File size: {} MiB", file_size_mib);
-    println!("Original filename: {}", filename);
-    println!("Splitting into {} chunks of {} KB each", total_chunks, CHUNK_SIZE / 1024);
+    log!("File size: {} MiB", file_size_mib);
+    log!("Original filename: {}", filename);
+    log!("Splitting into {} chunks of {} KB each", total_chunks, CHUNK_SIZE / 1024);
 
     let sender_hash = ripemd160_file(&file_path)?;
-    println!("Sender hash: {}", sender_hash);
+    log!("Sender hash: {}", sender_hash);
 
     let file_tag = generate_file_tag();
 
     let target_address: Recipient = match address.parse() {
         Ok(addr) => addr,
         Err(e) => {
-            eprintln!("Error: Invalid Nym address format");
-            eprintln!("Details: {}", e);
-            eprintln!("\nA valid Nym address has the format:");
-            eprintln!("  <Base58>.<Base58>@<Base58>");
-            eprintln!("\nPlease check your nymx.json configuration.");
+            log_err!("Error: Invalid Nym address format");
+            log_err!("Details: {}", e);
+            log_err!("\nA valid Nym address has the format:");
+            log_err!("  <Base58>.<Base58>@<Base58>");
+            log_err!("\nPlease check your nymx.json configuration.");
             client.disconnect().await;
             return Err("Invalid recipient address".into());
         }
     };
 
-    println!("\nSending handshake to check if recipient is online...");
+    log!("\nSending handshake to check if recipient is online...");
     let handshake_payload = build_handshake_payload(&file_tag);
     if let Err(e) = client.send_plain_message(target_address, handshake_payload).await {
-        eprintln!("Failed to send handshake: {}", e);
+        log_err!("Failed to send handshake: {}", e);
         client.disconnect().await;
         let elapsed = start_time.elapsed();
-        println!("Done!");
-        println!("Total time: {}", format_duration(elapsed));
+        log!("Done!");
+        log!("Total time: {}", format_duration(elapsed));
         return Ok(());
     }
 
-    println!("Waiting up to {}s for recipient response...", HANDSHAKE_TIMEOUT_SECS);
+    log!("Waiting up to {}s for recipient response...", HANDSHAKE_TIMEOUT_SECS);
     let handshake_result = timeout(Duration::from_secs(HANDSHAKE_TIMEOUT_SECS), async {
         loop {
             if let Some(msgs) = client.wait_for_messages().await {
@@ -92,25 +119,25 @@ pub async fn send_mode(address: String, file_path: PathBuf) -> Result<(), Box<dy
             let reply_str = String::from_utf8_lossy(&reply.message);
             let expected_prefix = format!("READY:{}", file_tag);
             if reply_str.starts_with(&expected_prefix) {
-                println!("✓ Recipient is online and ready!\n");
+                log!("Recipient is online and ready!\n");
                 true
             } else {
-                println!("✗ Unexpected response from recipient");
+                log!("Unexpected response from recipient");
                 false
             }
         }
         Err(_) => {
-            println!("✗ No response within {}s", HANDSHAKE_TIMEOUT_SECS);
+            log!("No response within {}s", HANDSHAKE_TIMEOUT_SECS);
             false
         }
     };
 
     if !handshake_ok {
-        println!("\nRecipient appears to be offline. Aborting before sending data.");
+        log!("\nRecipient appears to be offline. Aborting before sending data.");
         client.disconnect().await;
         let elapsed = start_time.elapsed();
-        println!("Done!");
-        println!("Total time: {}", format_duration(elapsed));
+        log!("Done!");
+        log!("Total time: {}", format_duration(elapsed));
         return Ok(());
     }
 
@@ -140,13 +167,13 @@ pub async fn send_mode(address: String, file_path: PathBuf) -> Result<(), Box<dy
             match client.send_plain_message(target_address, chunk_payload).await {
                 Ok(_) => {
                     if attempt > 0 {
-                        println!("\n✓ Chunk {} succeeded on attempt {}", chunk_idx + 1, attempt + 1);
+                        log!("\nChunk {} succeeded on attempt {}", chunk_idx + 1, attempt + 1);
                     }
                     break;
                 }
                 Err(e) => {
                     if attempt < MAX_RETRIES - 1 {
-                        eprintln!(
+                        log_err!(
                             "\nChunk {} failed (attempt {}/{}): {}. Retrying...",
                             chunk_idx + 1,
                             attempt + 1,
@@ -155,7 +182,7 @@ pub async fn send_mode(address: String, file_path: PathBuf) -> Result<(), Box<dy
                         );
                         sleep(Duration::from_millis(RETRY_DELAY_MS * (attempt as u64 + 1))).await;
                     } else {
-                        eprintln!(
+                        log_err!(
                             "\nChunk {} failed after {} attempts: {}",
                             chunk_idx + 1,
                             MAX_RETRIES,
@@ -173,14 +200,14 @@ pub async fn send_mode(address: String, file_path: PathBuf) -> Result<(), Box<dy
     overall_pb.finish_with_message("All chunks sent");
 
     if !failed_chunks.is_empty() {
-        println!("\nWarning: {} chunks failed to send:", failed_chunks.len());
+        log!("\nWarning: {} chunks failed to send:", failed_chunks.len());
         for chunk_idx in &failed_chunks {
-            println!("  - Chunk {}", chunk_idx + 1);
+            log!("  - Chunk {}", chunk_idx + 1);
         }
-        println!("The receiver may have an incomplete file.");
+        log!("The receiver may have an incomplete file.");
     }
 
-    println!("\nWaiting for reply or resend requests...\n");
+    log!("\nWaiting for reply or resend requests...\n");
 
     let file_path_clone = file_path.clone();
     let filename_clone = filename.clone();
@@ -198,14 +225,11 @@ pub async fn send_mode(address: String, file_path: PathBuf) -> Result<(), Box<dy
                 if msg.message.is_empty() {
                     continue;
                 }
-
                 let msg_str = String::from_utf8_lossy(&msg.message);
-
                 if msg_str.starts_with(RESEND_REQUEST_PREFIX) {
                     if let Some(chunk_idx_str) = msg_str.strip_prefix(RESEND_REQUEST_PREFIX) {
                         if let Ok(chunk_idx) = chunk_idx_str.parse::<usize>() {
-                            println!("Resend request received for chunk {}", chunk_idx + 1);
-
+                            log!("Resend request received for chunk {}", chunk_idx + 1);
                             let open_result = File::open(&file_path_clone);
                             let seek_result = open_result.and_then(|mut f| {
                                 let offset = chunk_idx as u64 * CHUNK_SIZE as u64;
@@ -214,22 +238,20 @@ pub async fn send_mode(address: String, file_path: PathBuf) -> Result<(), Box<dy
                                 let bytes_read = f.read(&mut buffer)?;
                                 Ok((buffer, bytes_read))
                             });
-
                             match seek_result {
                                 Ok((buffer, bytes_read)) => {
                                     let chunk_data = &buffer[..bytes_read];
                                     let chunk_header = build_chunk_header(chunk_idx, total_chunks_clone, file_size_bytes_clone, &filename_clone, &file_tag_clone);
                                     let mut chunk_payload = chunk_header;
                                     chunk_payload.extend_from_slice(chunk_data);
-
                                     if let Err(e) = client.send_plain_message(target_address_clone, chunk_payload).await {
-                                        eprintln!("Failed to resend chunk {}: {}", chunk_idx + 1, e);
+                                        log_err!("Failed to resend chunk {}: {}", chunk_idx + 1, e);
                                     } else {
-                                        println!("  ✓ Chunk {} resent", chunk_idx + 1);
+                                        log!("  Chunk {} resent", chunk_idx + 1);
                                     }
                                 }
                                 Err(e) => {
-                                    eprintln!("Failed to read chunk {} from file: {}", chunk_idx + 1, e);
+                                    log_err!("Failed to read chunk {} from file: {}", chunk_idx + 1, e);
                                 }
                             }
                         }
@@ -239,7 +261,6 @@ pub async fn send_mode(address: String, file_path: PathBuf) -> Result<(), Box<dy
                     break;
                 }
             }
-
             if reply_message.is_some() {
                 break;
             }
@@ -249,43 +270,42 @@ pub async fn send_mode(address: String, file_path: PathBuf) -> Result<(), Box<dy
     let reply_message = match reply_message {
         Some(msg) => msg,
         None => {
-            println!("Timeout: No reply received. The receiver likely has an incomplete file.");
+            log!("Timeout: No reply received. The receiver likely has an incomplete file.");
             client.disconnect().await;
             let elapsed = start_time.elapsed();
-            println!("Done!");
-            println!("Total time: {}", format_duration(elapsed));
+            log!("Done!");
+            log!("Total time: {}", format_duration(elapsed));
             return Ok(());
         }
     };
 
     if let Some(tag) = &reply_message.sender_tag {
-        println!("Reply Anonymous Sender Tag (SURB): {}", tag);
+        log!("Reply Anonymous Sender Tag (SURB): {}", tag);
     }
 
     let (_reply_file_tag, reply_hash) = match parse_reply_payload(&reply_message.message) {
         Ok(parsed) => parsed,
         Err(e) => {
-            println!("Failed to parse reply: {}", e);
+            log!("Failed to parse reply: {}", e);
             client.disconnect().await;
             let elapsed = start_time.elapsed();
-            println!("Done!");
-            println!("Total time: {}", format_duration(elapsed));
+            log!("Done!");
+            log!("Total time: {}", format_duration(elapsed));
             return Ok(());
         }
     };
 
-    println!("Receiver hash: {}", reply_hash);
-
+    log!("Receiver hash: {}", reply_hash);
     if sender_hash == reply_hash {
-        println!("Hashes match!");
+        log!("Hashes match!");
     } else {
-        println!("Hashes do not match!");
+        log!("Hashes do not match!");
     }
 
     client.disconnect().await;
     let elapsed = start_time.elapsed();
-    println!("Done!");
-    println!("Total time: {}", format_duration(elapsed));
+    log!("Done!");
+    log!("Total time: {}", format_duration(elapsed));
     Ok(())
 }
 
@@ -293,15 +313,16 @@ pub async fn send_parts_mode(address: String, prefix: PathBuf) -> Result<(), Box
     let start_time = Instant::now();
     let prefix_str = prefix.to_string_lossy().to_string();
 
-    println!("=== Parts Mode ===");
-    println!("Looking for files with prefix: {}", prefix_str);
+    log!("=== Parts Mode ===");
+    log!("Looking for files with prefix: {}", prefix_str);
 
     let expected_parts = parse_ripemd_file()?;
+
     if expected_parts.is_empty() {
         return Err("No parts found in ripemd-160.txt".into());
     }
 
-    println!("Found {} expected parts in ripemd-160.txt\n", expected_parts.len());
+    log!("Found {} expected parts in ripemd-160.txt\n", expected_parts.len());
 
     let mut part_files: Vec<(String, String, String)> = Vec::new();
 
@@ -324,17 +345,17 @@ pub async fn send_parts_mode(address: String, prefix: PathBuf) -> Result<(), Box
 
     part_files.sort_by(|a, b| a.0.cmp(&b.0));
 
-    println!("Found {} part files to send:\n", part_files.len());
+    log!("Found {} part files to send:\n", part_files.len());
     for (i, (filename, _, _)) in part_files.iter().enumerate() {
-        println!("  {}. {}", i + 1, filename);
+        log!("  {}. {}", i + 1, filename);
     }
-    println!();
+    log!("");
 
     let target_address: Recipient = match address.parse() {
         Ok(addr) => addr,
         Err(e) => {
-            eprintln!("Error: Invalid Nym address format");
-            eprintln!("Details: {}", e);
+            log_err!("Error: Invalid Nym address format");
+            log_err!("Details: {}", e);
             return Err("Invalid recipient address".into());
         }
     };
@@ -347,17 +368,17 @@ pub async fn send_parts_mode(address: String, prefix: PathBuf) -> Result<(), Box
         .unwrap();
 
     let our_address = client.nym_address();
-    println!("Your Nym address: {}", our_address);
-    println!("Sending anonymously to: {}\n", address);
+    log!("Your ephemeral Nym address: {}", our_address);
+    log!("Sending anonymously to: {}\n", address);
 
     let mut successful_parts = 0;
     let mut failed_parts = Vec::new();
 
     for (i, (filename, expected_hash, file_path_str)) in part_files.iter().enumerate() {
         let part_start_time = Instant::now();
-        println!("\n========================================");
-        println!("Sending part {}/{}: {}", i + 1, part_files.len(), filename);
-        println!("========================================\n");
+        log!("\n========================================");
+        log!("Sending part {}/{}: {}", i + 1, part_files.len(), filename);
+        log!("========================================\n");
 
         let file_path = PathBuf::from(file_path_str);
 
@@ -366,44 +387,44 @@ pub async fn send_parts_mode(address: String, prefix: PathBuf) -> Result<(), Box
                 successful_parts += 1;
                 let part_elapsed = part_start_time.elapsed();
                 let total_elapsed = start_time.elapsed();
-                println!("\n✓ Part {} completed successfully", i + 1);
-                println!("  Part time: {}", format_duration(part_elapsed));
-                println!("  Total elapsed: {}\n", format_duration(total_elapsed));
+                log!("\nPart {} completed successfully", i + 1);
+                log!("  Part time: {}", format_duration(part_elapsed));
+                log!("  Total elapsed: {}\n", format_duration(total_elapsed));
             }
             Ok(false) => {
                 failed_parts.push((i + 1, filename.clone(), "Hash mismatch".to_string()));
-                println!("\n✗ Part {} failed: Hash mismatch\n", i + 1);
+                log!("\nPart {} failed: Hash mismatch\n", i + 1);
             }
             Err(e) => {
                 failed_parts.push((i + 1, filename.clone(), e.to_string()));
-                println!("\n✗ Part {} failed: {}\n", i + 1, e);
+                log!("\nPart {} failed: {}\n", i + 1, e);
             }
         }
 
         if i < part_files.len() - 1 {
-            println!("Waiting 2 seconds before next part...");
+            log!("Waiting 2 seconds before next part...");
             sleep(Duration::from_secs(2)).await;
         }
     }
 
-    println!("\n========================================");
-    println!("=== Parts Transfer Summary ===");
-    println!("========================================");
-    println!("Total parts: {}", part_files.len());
-    println!("Successful: {}", successful_parts);
-    println!("Failed: {}", failed_parts.len());
+    log!("\n========================================");
+    log!("=== Parts Transfer Summary ===");
+    log!("========================================");
+    log!("Total parts: {}", part_files.len());
+    log!("Successful: {}", successful_parts);
+    log!("Failed: {}", failed_parts.len());
 
     if !failed_parts.is_empty() {
-        println!("\nFailed parts:");
+        log!("\nFailed parts:");
         for (num, filename, error) in &failed_parts {
-            println!("  Part {}: {} - {}", num, filename, error);
+            log!("  Part {}: {} - {}", num, filename, error);
         }
     }
 
     client.disconnect().await;
     let elapsed = start_time.elapsed();
-    println!("\nDone!");
-    println!("Total time: {}", format_duration(elapsed));
+    log!("\nDone!");
+    log!("Total time: {}", format_duration(elapsed));
     Ok(())
 }
 
@@ -423,13 +444,13 @@ async fn send_single_part(
         .to_string_lossy()
         .to_string();
 
-    println!("File size: {} MiB", file_size_mib);
-    println!("Original filename: {}", filename);
-    println!("Splitting into {} chunks of {} KB each", total_chunks, CHUNK_SIZE / 1024);
+    log!("File size: {} MiB", file_size_mib);
+    log!("Original filename: {}", filename);
+    log!("Splitting into {} chunks of {} KB each", total_chunks, CHUNK_SIZE / 1024);
 
     let sender_hash = ripemd160_file(file_path)?;
-    println!("Sender hash: {}", sender_hash);
-    println!("Expected hash: {}", expected_hash);
+    log!("Sender hash: {}", sender_hash);
+    log!("Expected hash: {}", expected_hash);
 
     if sender_hash != expected_hash {
         return Err("File hash does not match expected hash from ripemd-160.txt".into());
@@ -437,13 +458,13 @@ async fn send_single_part(
 
     let file_tag = generate_file_tag();
 
-    println!("\nSending handshake...");
+    log!("\nSending handshake...");
     let handshake_payload = build_handshake_payload(&file_tag);
     if let Err(e) = client.send_plain_message(target_address, handshake_payload).await {
         return Err(format!("Failed to send handshake: {}", e).into());
     }
 
-    println!("  Waiting up to {}s for recipient response...", HANDSHAKE_TIMEOUT_SECS);
+    log!("  Waiting up to {}s for recipient response...", HANDSHAKE_TIMEOUT_SECS);
     let handshake_result = timeout(Duration::from_secs(HANDSHAKE_TIMEOUT_SECS), async {
         loop {
             if let Some(msgs) = client.wait_for_messages().await {
@@ -460,15 +481,15 @@ async fn send_single_part(
             let reply_str = String::from_utf8_lossy(&reply.message);
             let expected_prefix = format!("READY:{}", file_tag);
             if reply_str.starts_with(&expected_prefix) {
-                println!("  ✓ Recipient is online and ready!\n");
+                log!("  Recipient is online and ready!\n");
                 true
             } else {
-                println!("  ✗ Unexpected response from recipient");
+                log!("  Unexpected response from recipient");
                 false
             }
         }
         Err(_) => {
-            println!("  ✗ No response within {}s", HANDSHAKE_TIMEOUT_SECS);
+            log!("  No response within {}s", HANDSHAKE_TIMEOUT_SECS);
             false
         }
     };
@@ -503,13 +524,13 @@ async fn send_single_part(
             match client.send_plain_message(target_address, chunk_payload).await {
                 Ok(_) => {
                     if attempt > 0 {
-                        println!("\n✓ Chunk {} succeeded on attempt {}", chunk_idx + 1, attempt + 1);
+                        log!("\nChunk {} succeeded on attempt {}", chunk_idx + 1, attempt + 1);
                     }
                     break;
                 }
                 Err(e) => {
                     if attempt < MAX_RETRIES - 1 {
-                        eprintln!(
+                        log_err!(
                             "\nChunk {} failed (attempt {}/{}): {}. Retrying...",
                             chunk_idx + 1,
                             attempt + 1,
@@ -518,7 +539,7 @@ async fn send_single_part(
                         );
                         sleep(Duration::from_millis(RETRY_DELAY_MS * (attempt as u64 + 1))).await;
                     } else {
-                        eprintln!(
+                        log_err!(
                             "\nChunk {} failed after {} attempts: {}",
                             chunk_idx + 1,
                             MAX_RETRIES,
@@ -539,7 +560,7 @@ async fn send_single_part(
         return Err(format!("{} chunks failed to send", failed_chunks.len()).into());
     }
 
-    println!("\nWaiting for reply or resend requests...\n");
+    log!("\nWaiting for reply or resend requests...\n");
 
     let file_path_clone = file_path.clone();
     let filename_clone = filename.clone();
@@ -557,14 +578,11 @@ async fn send_single_part(
                 if msg.message.is_empty() {
                     continue;
                 }
-
                 let msg_str = String::from_utf8_lossy(&msg.message);
-
                 if msg_str.starts_with(RESEND_REQUEST_PREFIX) {
                     if let Some(chunk_idx_str) = msg_str.strip_prefix(RESEND_REQUEST_PREFIX) {
                         if let Ok(chunk_idx) = chunk_idx_str.parse::<usize>() {
-                            println!("Resend request received for chunk {}", chunk_idx + 1);
-
+                            log!("Resend request received for chunk {}", chunk_idx + 1);
                             let open_result = File::open(&file_path_clone);
                             let seek_result = open_result.and_then(|mut f| {
                                 let offset = chunk_idx as u64 * CHUNK_SIZE as u64;
@@ -573,22 +591,20 @@ async fn send_single_part(
                                 let bytes_read = f.read(&mut buffer)?;
                                 Ok((buffer, bytes_read))
                             });
-
                             match seek_result {
                                 Ok((buffer, bytes_read)) => {
                                     let chunk_data = &buffer[..bytes_read];
                                     let chunk_header = build_chunk_header(chunk_idx, total_chunks_clone, file_size_bytes_clone, &filename_clone, &file_tag_clone);
                                     let mut chunk_payload = chunk_header;
                                     chunk_payload.extend_from_slice(chunk_data);
-
                                     if let Err(e) = client.send_plain_message(target_address_clone, chunk_payload).await {
-                                        eprintln!("Failed to resend chunk {}: {}", chunk_idx + 1, e);
+                                        log_err!("Failed to resend chunk {}: {}", chunk_idx + 1, e);
                                     } else {
-                                        println!("  ✓ Chunk {} resent", chunk_idx + 1);
+                                        log!("  Chunk {} resent", chunk_idx + 1);
                                     }
                                 }
                                 Err(e) => {
-                                    eprintln!("Failed to read chunk {} from file: {}", chunk_idx + 1, e);
+                                    log_err!("Failed to read chunk {} from file: {}", chunk_idx + 1, e);
                                 }
                             }
                         }
@@ -598,7 +614,6 @@ async fn send_single_part(
                     break;
                 }
             }
-
             if reply_message.is_some() {
                 break;
             }
@@ -619,13 +634,12 @@ async fn send_single_part(
         }
     };
 
-    println!("Receiver hash: {}", reply_hash);
-
+    log!("Receiver hash: {}", reply_hash);
     if sender_hash == reply_hash {
-        println!("✓ Hashes match!");
+        log!("Hashes match!");
         Ok(true)
     } else {
-        println!("✗ Hashes do not match!");
+        log!("Hashes do not match!");
         Ok(false)
     }
 }
@@ -633,25 +647,33 @@ async fn send_single_part(
 fn parse_ripemd_file() -> Result<HashMap<String, String>, Box<dyn std::error::Error>> {
     let content = fs::read_to_string("ripemd-160.txt")?;
     let mut parts = HashMap::new();
-
     for line in content.lines() {
         let line = line.trim();
-        if line.is_empty() || line.starts_with("RIPEMD") || line.starts_with("Operation") ||
+        if line.is_empty() {
+            continue;
+        }
+        if line.starts_with("RIPEMD") || line.starts_with("Operation") ||
            line.starts_with("Original") || line.starts_with("Parts") || line.starts_with("---") {
             continue;
         }
-
         if let Some(colon_pos) = line.rfind(':') {
             let hash = line[colon_pos + 1..].trim().to_string();
             let before_colon = &line[..colon_pos];
-
             if let Some(paren_pos) = before_colon.rfind('(') {
                 let filename = before_colon[..paren_pos].trim().to_string();
-                parts.insert(filename, hash);
+                if !filename.is_empty() && !hash.is_empty() {
+                    parts.insert(filename, hash);
+                }
+            } else {
+                if let Some(space_pos) = before_colon.rfind(' ') {
+                    let filename = before_colon[..space_pos].trim().to_string();
+                    if !filename.is_empty() && !hash.is_empty() {
+                        parts.insert(filename, hash);
+                    }
+                }
             }
         }
     }
-
     Ok(parts)
 }
 
@@ -659,7 +681,6 @@ fn format_duration(duration: Duration) -> String {
     let total_secs = duration.as_secs();
     let minutes = total_secs / 60;
     let seconds = total_secs % 60;
-
     if minutes > 0 {
         format!("{}m {:02}s", minutes, seconds)
     } else {
@@ -682,12 +703,10 @@ fn build_chunk_header(chunk_idx: usize, total_chunks: usize, file_size: u64, fil
     header.extend_from_slice(&(chunk_idx as u32).to_be_bytes());
     header.extend_from_slice(&(total_chunks as u32).to_be_bytes());
     header.extend_from_slice(&file_size.to_be_bytes());
-
     let filename_bytes = filename.as_bytes();
     header.extend_from_slice(&(filename_bytes.len() as u16).to_be_bytes());
     header.extend_from_slice(filename_bytes);
     header.extend_from_slice(file_tag.as_bytes());
-
     header
 }
 
@@ -695,17 +714,14 @@ fn parse_reply_payload(payload: &[u8]) -> Result<(String, String), &'static str>
     if payload.len() < FILE_TAG_LEN {
         return Err("Reply payload too short");
     }
-
     let file_tag = String::from_utf8_lossy(&payload[..FILE_TAG_LEN]).to_string();
     let hash = String::from_utf8_lossy(&payload[FILE_TAG_LEN..]).to_string();
-
     Ok((file_tag, hash))
 }
 
 fn generate_file_tag() -> String {
     const CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
     let mut rng = rand::thread_rng();
-
     (0..FILE_TAG_LEN)
         .map(|_| {
             let idx = rng.gen_range(0..CHARSET.len());
@@ -718,7 +734,6 @@ fn ripemd160_file(path: &PathBuf) -> Result<String, Box<dyn std::error::Error>> 
     let mut file = File::open(path)?;
     let mut hasher = Ripemd160::new();
     let mut buffer = [0u8; 65536];
-
     loop {
         let bytes_read = file.read(&mut buffer)?;
         if bytes_read == 0 {
@@ -726,6 +741,5 @@ fn ripemd160_file(path: &PathBuf) -> Result<String, Box<dyn std::error::Error>> 
         }
         hasher.update(&buffer[..bytes_read]);
     }
-
     Ok(hex::encode(hasher.finalize()))
 }

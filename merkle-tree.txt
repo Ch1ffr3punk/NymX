@@ -1,14 +1,20 @@
 --- FILE HASHES (RIPEMD-160) ---
-Cargo.toml: 87a36532d0ade6cbd4a56639e5a67c9aafd22085
+Cargo.toml: 03952af89f82c5c7f70556b0a42c417e052bcf37
 LICENSE: 304c26c26e8af4d60f1e0818baa73f8ac9b511fd
-README.md: eac64009e122eb8f5178137c9cf089e602412c38
-nymx.json: 60c9e839253f50f12ea28aaf68fb0a3be23fae1f
-src\config.rs: befaba14d4eac354e092cb266609148d88c90d7f
-src\get.rs: 60f534dcb67b8c45913db838f6ee2f3d245d230c
-src\main.rs: 50bfc5e15da632cfc44536dbdaddfe66baadd68b
+NymX-GUI-Win\Cargo.toml: badd9b129b0ca0a24c8ebfb8a7d4335894a822a0
+NymX-GUI-Win\assets\icon.ico: ddb2c9ae9409267426cbbd1cb464a6b6cc51543c
+NymX-GUI-Win\assets\icon.png: 666aaa168a455fc9df7a660dd8210775c4ae9698
+NymX-GUI-Win\build.rs: 79d5081b24be3b6c2800fae74848f7e28b83de02
+NymX-GUI-Win\src\config.rs: 9e4d97950741375389b634e7c047709fc7da37ed
+NymX-GUI-Win\src\main.rs: 0e504f15790c4743a92734dd7ff57d32e0fae712
+NymX-GUI-Win\src\receive.rs: a80cd443959c2652d8a209a88ef6ad6c06e69d00
+NymX-GUI-Win\src\send.rs: 8c8bfbc07012eba27a463bf1c5279e265cb7d2af
+README.md: d1c23cf32be23335286836adc422ed1f0ce3566f
+nymx.json: ebf9bcc498cd01da3818072dfd6335d55135eb6c
+src\config.rs: 7862fe6b48eb3509f797542920755a28fecb088c
+src\main.rs: 49ffdc3d12e1f4a3a30928d8c2b69eec52347607
 src\receive.rs: 415fafc29d76ef897b960a8fcf84fa53f1755f4e
-src\send.rs: 17192f860f247c3ced71007a4dd2fd1b4ffffcf6
-src\ssh.rs: 83d0f5462dd91668a72652ee7b1a5059a5a9bcb1
+src\send.rs: 7df28d0a618c78420c9a58bab3240b1742c29390
 
 --- ROOT HASH (RIPEMD-160) ---
-fb446cf0f325832e2a3ddd571a0afca627575f3c
+c1b00091afa7d728106b20a34ebb77cb0a124ab9
